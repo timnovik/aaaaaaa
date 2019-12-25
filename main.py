@@ -1,142 +1,35 @@
-import vk_api
-import sqlite3
-from base import create_base
-from vk_api.longpoll import VkLongPoll, VkEventType
 from collections import deque
+from functions import *
+from vk_api.longpoll import VkEventType
 
-token = 'd82dafe5d1e11f83b5fd893fac3c799632e3aa6f60eee4a86799c43138f00afc712a13adfb5022ca2e05c'
-vk_session = vk_api.VkApi(token='55d012dfde7be9b48ac454b87c4e9b456bbbe91e5aeace2a7938ffba5b58c354f31a607a8261c81e7bd98')
+vk, longpoll, conn, cursor = give_vars()
 
-longpoll = VkLongPoll(vk_session)
-vk = vk_session.get_api()
-create_base()
-conn = sqlite3.connect("main.db")
-cursor = conn.cursor()
+log = deque()
 
-NO_PERMISSION = 'У вас недостаточно полномочий для использования этой команды.'
-ADMIN_KEY = 'ww7ir32smf40djbq'
-MAIN_ADMIN_KEY = 'djf7y4n9ia22ut85'
-DEV_KEY = 'stronghold_top_wpg'
-LOG = deque()
-PARAMETERS = {'country': ['название', 'правитель', 'деньги', 'лес', 'еда', 'металлы', 'электроэнергия', 'нефть',
-                          'моб.ресурс', 'количество призывников', 'гражданские ресурсы', 'горючее',
-                          'военное снабжение', 'беспорядки'],
+cursor.execute('pragma table_info(prov_infc)')
+COLUMNS_PROV = list(map(lambda x: x[1], cursor.fetchall()))
+cursor.execute('pragma table_info(country_infc)')
+COLUMNS_COUNTRY = list(map(lambda x: x[1], cursor.fetchall()))
 
-              'land': ['название', 'страна-владелец', 'игрок-владелец',
-                       'ранг (провинция -> мегаполис, или открытое море/ИЭЗ)',
-                       'тип провинции (сухопутная/морская)', 'статус - национальная, оккупированная и т.д',
-                       'страна, оказывающая влияние на провинцию', 'постройка']}
-CHECK = {'country': [lambda x: x.isalpha()] + [lambda x: x != 0] + [lambda x: x.isdigit()] * 11 +
-                    [lambda x: x in [str(i) for i in range(11)]],
-         'land': [lambda x: x.isalpha()] * 3 + [lambda x: x.isdigit()] + [lambda x: x in ['сухопутная', 'морская']] +
-                 [lambda x: x in ['национальная', 'оккупированная', 'удерживаемая', 'под контролем']] +
-         [lambda x: x.isalpha()] + [lambda x: x in ['лесопилка', 'фермы', 'шахта', 'ТЭЦ', 'АЭС', 'ВИЭ', 'скважина',
-                                                    'завод', 'военная база', 'нпз', 'морской порт', 'авиабаза',
-                                                    'система ПРО', 'бараки']]}
-
-
-def name(id):
-    return vk.users.get(user_id=id, fields='screen_name')[0]['screen_name']
-
-
-def id(s):
-    try:
-        return vk.users.get(user_ids=s)[0]['id']
-    except:
-        return 0
-
-
-def update_roles():
-    global users
-    cursor.execute('SELECT * FROM users_infc')
-    users = {}
-    for user, rang in cursor.fetchall():
-        users[user] = int(rang)
-
-
-def add_province(args, user_id):
-    if users[user_id] >= 2:
-        list1 = []
-        for i in range(len(args)):
-            if CHECK['land'][i](args[i]):
-                list1.append(args[i])
-            else:
-                return f'Ошибка во время чтения параметра №{i + 1}: {PARAMETERS["land"][i]}. Проверьте формат ввода сообщением "параметры провинции" и попробуйте снова.'
-        cursor.execute(f"INSERT INTO prov_infc VALUES({','.join(['?' for _ in range(len(PARAMETERS['land']))])})",
-                       list1)
-        sql = "SELECT * FROM prov_infc WHERE NAME=?"
-        cursor.execute(sql, [(list1[1])])
-        conn.commit()
-        return 'Провинция успешно добавлена в список.'
-    return vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
-
-
-def add_user():
-    print("Тут должно быть добавление нового пользователя")
-
-
-def add_country(args, user_id):
-    if users[user_id] >= 2:
-        list1 = []
-        for i in range(len(args)):
-            if CHECK['country'][i](args[i]):
-                list1.append(args[i])
-            else:
-                return f'Ошибка во время чтения параметра №{i + 1}: {PARAMETERS["country"][i]}. Проверьте формат ввода сообщением "параметры страны" и попробуйте снова.'
-        cursor.execute(f"INSERT INTO country_infc VALUES({','.join(['?' for _ in range(len(PARAMETERS['country']))])})", list1)
-        sql = "SELECT * FROM country_infc WHERE NAME=?"
-        cursor.execute(sql, [(list1[1])])
-        conn.commit()
-        return 'Страна успешно добавлена в список.'
-    return NO_PERMISSION
-
-
-def show_country(user_id, country=0):
-    if country:
-        cursor.execute('SELECT * FROM country_infc WHERE NAME = ?', [country])
-        l = []
-        try:
-            d = list(cursor.fetchall()[0])
-        except:
-            vk.messages.send(random_id=0, user_id=user_id, message='Страна не найдена.')
-            return 0
-        if user_id == int(d[1]) or users[user_id] >= 2:
-            d[1] = '@' + name(int(d[1]))
-            for i in range(len(d)):
-                l.append(f'{PARAMETERS["country"][i]}: {d[i]}')
-            vk.messages.send(random_id=0, user_id=user_id, message='\n'.join(l))
-        else:
-            vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
-    elif users[user_id] >= 2:
-        cursor.execute('SELECT NAME FROM country_infc')
-        d = list(map(lambda x: x[0], cursor.fetchall()))
-        for country_name in d:
-            show_country(user_id, country_name)
-    else:
-        vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
-
-
-update_roles()
 for event in longpoll.listen():
     try:
         if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
-            if event.user_id not in users:
-                cursor.execute('INSERT INTO users_infc VALUES(?,?)', [event.user_id, 1])
-                users[event.user_id] = 1
+            if event.user_id not in update_roles():
+                cursor.execute('INSERT INTO update_roles()_infc VALUES(?,?)', [event.user_id, 1])
             # Слушаем longpoll, если пришло сообщение, то:
             cmd = list(map(lambda x: x.lower(), event.text.split()))
             if cmd[0] == 'log':
-                if event.from_user and users[event.user_id] == 4:
-                    for _ in range(len(LOG)):
+                if event.from_user and update_roles()[event.user_id] == 4:
+                    for _ in range(len(log)):
                         vk.messages.send(
                             random_id=0,
                             user_id=event.user_id,
-                            message=LOG[_][1] + ':\n' + LOG[_][0]
+                            message=log[_][1] + ':\n' + log[_][0]
                         )
             elif cmd[0] == 'log_last':
-                if event.from_user and users[event.user_id] == 4:
+                if event.from_user and update_roles()[event.user_id] == 4:
                     try:
-                        log_last = LOG.pop()
+                        log_last = log.pop()
                     except:
                         log_last = ['empty deque', 'Error']
                     vk.messages.send(
@@ -147,17 +40,14 @@ for event in longpoll.listen():
             elif cmd[0:2] == ['ввести', 'ключ']:
                 if event.from_user:
                     try:
-                        if cmd[2] == 'админ' and cmd[3] == ADMIN_KEY:
-                            users[event.user_id] = 2
-                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
+                        if cmd[2] == ADMIN_KEY:
+                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
-                        elif cmd[2] == 'главадмин' and cmd[3] == MAIN_ADMIN_KEY:
-                            users[event.user_id] = 3
-                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
+                        elif cmd[2] == MAIN_ADMIN_KEY:
+                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
-                        elif cmd[2] == 'разработчик' and cmd[3] == DEV_KEY:
-                            users[event.user_id] = 4
-                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
+                        elif cmd[2] == DEV_KEY:
+                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         else:
                             print(1 / 0)
@@ -165,13 +55,13 @@ for event in longpoll.listen():
                         vk.messages.send(
                             random_id=0,
                             user_id=event.user_id,
-                            message='Ошибка: некорректный запрос, роль или ключ. Используйте команду "роли"'
+                            message='Ошибка: некорректный ключ.'
                         )
             elif cmd[0] == 'роль':
                 if event.from_user:
                     vk.messages.send(random_id=0, user_id=event.user_id,
                                      message=
-                                     f'Ты {[0, "игрок", "админ", "главадмин", "разраб"][users[event.user_id]]}.')
+                                     f'Ты {[0, "игрок", "админ", "главадмин", "разраб"][update_roles()[event.user_id]]}.')
             elif cmd[0] == 'роли':
                 if event.from_user:
                     vk.messages.send(
@@ -190,10 +80,19 @@ for event in longpoll.listen():
                         cmd.append(1)
                     if not cmd[1].isdigit():
                         cmd[1] = id(cmd[1])
-                    if cmd[1] in users and (users[event.user_id] > users[cmd[1]] or users[event.user_id] == 4):
-                        users[cmd[1]] -= int(cmd[2])
-                        users[cmd[1]] = max(1, users[cmd[1]])
-                        cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [users[cmd[1]], event.user_id])
+                    if cmd[1] in update_roles() and (update_roles()[event.user_id] > update_roles()[cmd[1]] or update_roles()[event.user_id] == 4):
+                        cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [max(1, update_roles()[cmd[1]] - int(cmd[2])), event.user_id])
+                        vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
+                    else:
+                        vk.messages.send(random_id=0, user_id=event.user_id, message=NO_PERMISSION)
+            elif cmd[0] == 'повысить' and len(cmd) >= 2:
+                if event.from_user:
+                    if len(cmd) == 2:
+                        cmd.append(1)
+                    if not cmd[1].isdigit():
+                        cmd[1] = id(cmd[1])
+                    if cmd[1] in update_roles() and (update_roles()[event.user_id] > update_roles()[cmd[1]] + cmd[2] or update_roles()[event.user_id] == 4):
+                        cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [min(4, update_roles()[cmd[1]] + int(cmd[2])), event.user_id])
                         vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                     else:
                         vk.messages.send(random_id=0, user_id=event.user_id, message=NO_PERMISSION)
@@ -221,15 +120,20 @@ for event in longpoll.listen():
                         message='''Вот список моих команд:
 Начать, Бот - вызовет приветствие.
 Помощь - вызовет список команд.
-Добавить страну - добавит страну в базу данных. Узнайте формат параметров командой "параметры страны".
-Посмотреть страну x - выведет всю информацию о стране x.
-Посмотреть страны - выведет всю информацию о всех странах.
 Роли - выводит информацию о получении ролей и их полномочиях.
-Добавить провинцию - добавит провинцию в базу данных. Формат - Используйте "параметры провинции".'''
+Роль - выводит вашу роль.
+Добавить страну - добавит страну в базу данных. Узнайте формат параметров командой "параметры страны".
+Изменить страну х - изменяет параметры страны х. Формат: изменить страну {название}: {параметр_1}: {значение_1}, {параметр_2}: {значение_2}, ...
+Показать страну x - выведет всю информацию о стране x.
+Показать страны / страны - выведет всю информацию о всех странах.
+Добавить провинцию - добавит провинцию в базу данных. Узнайте формат параметров командой "параметры провинции".
+Изменить провинцию - аналогично такой же функции у стран. 
+Показать провинцию x - выведет всю информацию о провинции x.
+Показать провинции / провинции - выведет всю информацию о всех провинциях.'''
                 )
             elif cmd[0:2] == ['добавить', 'страну']:
                 if event.from_user:
-                    args = cmd[2:]
+                    args = delete_commas(cmd[2:])
                     if len(args) != len(PARAMETERS['country']):
                         vk.messages.send(
                             random_id=0,
@@ -248,25 +152,54 @@ for event in longpoll.listen():
                     vk.messages.send(
                         random_id=0,
                         user_id=event.user_id,
-                        message=f'Параметры: {", ".join(PARAMETERS["country"])}. Название - строка без цифр. Правитель - тег(@t13novik), но без @. Беспорядки - число от 0 до 10. Остальное - целые числа, не меньшие 0.')
+                        message=f'Параметры: {", ".join(PARAMETERS["country"])}. Название - строка без цифр. '
+                                f'Правитель - тег(@t13novik), но без @. Беспорядки - число от 0 до 10. Остальное - '
+                                f'целые числа, не меньшие 0. Все аргументы писать через запятую+пробел(0, 0, 0)')
             elif cmd[0:2] == ['показать', 'страну']:
                 show_country(event.user_id, cmd[2])
-            elif cmd[0:2] == ['показать', 'страны']:
+            elif cmd[0:2] == ['показать', 'страны'] or cmd[0] == 'страны':
                 show_country(event.user_id)
+            elif cmd[0:2] == ['изменить', 'страну']:
+                params = ' '.join(cmd[2:]).replace(',', ':').replace('\n', ':').split(': ')
+                cmd = cmd[0:2] + params
+                if len(cmd) >= 5 and len(cmd) % 2:
+                    d = {cmd[i]: cmd[i + 1][:-1] if cmd[i + 1][-1] == ',' else cmd[i + 1] for i in range(3, len(cmd), 2)}
+                    edit_country(event.user_id, cmd[2], **d)
             elif cmd[0:2] == ['параметры', 'провинции']:
                 if event.from_user:
                     vk.messages.send(
                         random_id=0,
                         user_id=event.user_id,
-                        message=f'Параметры: {", ".join(PARAMETERS["land"])}. Названия и имена - строки без цифр.')
+                        message=f'Параметры: {", ".join(PARAMETERS["prov"])}. Названия и имена - строки без цифр. '
+                                f'Все аргументы писать через запятую+пробел(0, 0, 0)')
             elif cmd[0:2] == ['добавить', 'провинцию']:
                 if event.from_user:
-                    args = cmd[2:]
-                    answer = add_province(args, event.user_id)
-                    vk.messages.send(
-                        random_id=0,
-                        user_id=event.user_id,
-                        message=answer)
+                    args = delete_commas(cmd[2:])
+                    if len(args) != len(PARAMETERS['prov']):
+                        vk.messages.send(
+                            random_id=0,
+                            user_id=event.user_id,
+                            message='Ошибка: некорректное число параметров. Проверьте формат ввода сообщением "параметры провинции" и попробуйте снова.')
+                        pass
+                    else:
+                        args[2] = id(args[2])
+                        answer = add_prov(args, event.user_id)
+                        vk.messages.send(
+                            random_id=0,
+                            user_id=event.user_id,
+                            message=answer)
+            elif cmd[0:2] == ['показать', 'провинцию']:
+                show_prov(event.user_id, cmd[2])
+            elif cmd[0:2] == ['показать', 'провинции'] or cmd[0] == 'провинции':
+                show_prov(event.user_id)
+            elif cmd[0:2] == ['изменить', 'провинцию']:
+                params = ' '.join(cmd[2:]).replace(',', ':').replace('\n', ':').split(': ')
+                cmd = cmd[0:2] + params
+                if len(cmd) >= 5 and len(cmd) % 2:
+                    d = {cmd[i]: cmd[i + 1][:-1] if cmd[i + 1][-1] == ',' else cmd[i + 1] for i in range(3, len(cmd), 2)}
+                    edit_prov(event.user_id, cmd[2], **d)
+            elif cmd[0] == 'test':
+                print(event.text.split('\n'))
             else:
                 if event.from_user:
                     vk.messages.send(
@@ -275,9 +208,9 @@ for event in longpoll.listen():
                         message='А вот это вот я не понимаю. Прости :('
                     )
             if 'log_last' != cmd[0] != 'log':
-                LOG.append([event.text, '@' + name(event.user_id)])
-                if len(LOG) >= 500:
-                    LOG.popleft()
+                log.append([event.text, '@' + name(event.user_id)])
+                if len(log) >= 1000:
+                    log.popleft()
     except EOFError:  # Тупа костыль, который пока деактивирован(вообще костыль нужен, чтобы бот никогда не падал)
         vk.messages.send(
                         random_id=0,

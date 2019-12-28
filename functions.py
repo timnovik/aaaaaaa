@@ -3,6 +3,7 @@ import sqlite3
 from vk_api.longpoll import VkLongPoll
 from base import create_base
 from constants import *
+from time import time
 
 vk_session = vk_api.VkApi(token=TOKEN)
 
@@ -32,16 +33,16 @@ def id(s):
         return 0
 
 
-def update_roles():
-    cursor.execute('SELECT * FROM users_infc')
-    l = {}
-    for user, rang in cursor.fetchall():
-        l[user] = int(rang)
-    return l
+def role(user_id):
+    cursor.execute('SELECT RANG FROM users_infc WHERE ID = ?', [user_id])
+    s = cursor.fetchall()
+    if len(s) == 1:
+        return cursor.fetchall()[0][0]
+    return 0
 
 
 def add_prov(args, user_id):
-    if update_roles()[user_id] >= 2:
+    if role(user_id) >= 2:
         list1 = []
         for i in range(len(args)):
             if CHECK['prov'][i](args[i]):
@@ -67,14 +68,14 @@ def show_prov(user_id, prov=0):
         except:
             vk.messages.send(random_id=0, user_id=user_id, message='Страна не найдена.')
             return 0
-        if user_id == int(d[2]) or update_roles()[user_id] >= 2:
+        if user_id == int(d[2]) or role(user_id) >= 2:
             d[2] = '@' + name(int(d[2]))
             for i in range(len(d)):
                 l.append(f'{PARAMETERS["prov"][i]}: {d[i]}')
             vk.messages.send(random_id=0, user_id=user_id, message='\n'.join(l))
         else:
             vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
-    elif update_roles()[user_id] >= 2:
+    elif role(user_id) >= 2:
         cursor.execute('SELECT NAME FROM prov_infc')
         d = list(map(lambda x: x[0], cursor.fetchall()))
         for prov_name in d:
@@ -86,7 +87,7 @@ def show_prov(user_id, prov=0):
 def edit_prov(user_id, prov, **kwargs):
     cursor.execute('SELECT * FROM prov_infc WHERE NAME = ?', [prov])
     l = list(cursor.fetchall()[0])
-    if user_id == int(l[2]) and update_roles()[user_id] >= 2:
+    if user_id == int(l[2]) and role(user_id) >= 2:
         for parameter, value in kwargs.items():
             if parameter in PARAMETERS['prov']:
                 ind = PARAMETERS['prov'].index(parameter)
@@ -133,8 +134,14 @@ def edit_prov(user_id, prov, **kwargs):
         )
 
 
+def get_prov(prov):
+    cursor.execute('SELECT * FROM prov_infc WHERE NAME = ?', [prov])
+    s = cursor.fetchall()
+    return {PARAMETERS['prov'][i]: s[i] for i in range(len(PARAMETERS['prov']))}
+
+
 def add_country(args, user_id):
-    if update_roles()[user_id] >= 2:
+    if role(user_id) >= 2:
         list1 = []
         for i in range(len(args)):
             if CHECK['country'][i](args[i]):
@@ -160,14 +167,14 @@ def show_country(user_id, country=0):
         except:
             vk.messages.send(random_id=0, user_id=user_id, message='Страна не найдена.')
             return 0
-        if user_id == int(d[1]) or update_roles()[user_id] >= 2:
+        if user_id == int(d[1]) or role(user_id) >= 2:
             d[1] = '@' + name(int(d[1]))
             for i in range(len(d)):
                 l.append(f'{PARAMETERS["country"][i]}: {d[i]}')
             vk.messages.send(random_id=0, user_id=user_id, message='\n'.join(l))
         else:
             vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
-    elif update_roles()[user_id] >= 2:
+    elif role(user_id) >= 2:
         cursor.execute('SELECT NAME FROM country_infc')
         d = list(map(lambda x: x[0], cursor.fetchall()))
         for country_name in d:
@@ -179,7 +186,7 @@ def show_country(user_id, country=0):
 def edit_country(user_id, country, **kwargs):
     cursor.execute('SELECT * FROM country_infc WHERE NAME = ?', [country])
     l = list(cursor.fetchall()[0])
-    if user_id == int(l[1]) and update_roles()[user_id] >= 2:
+    if user_id == int(l[1]) and role(user_id) >= 2:
         for parameter, value in kwargs.items():
             if parameter in PARAMETERS['country']:
                 ind = PARAMETERS['country'].index(parameter)
@@ -223,3 +230,48 @@ def edit_country(user_id, country, **kwargs):
             user_id=user_id,
             message=NO_PERMISSION
         )
+
+
+def get_country(country):
+    cursor.execute('SELECT * FROM country_infc WHERE NAME = ?', [country])
+    s = cursor.fetchall()
+    return {PARAMETERS['country'][i]: s[i] for i in range(len(PARAMETERS['country']))}
+
+
+def turn(user_id, last_turn):
+    if role(user_id) >= 2:
+        if time() - last_turn >= 24 * 60 * 60:
+            cursor.execute('SELECT NAME FROM prov_infc')
+            for prov_name in cursor.fetchall():
+                prov = get_prov(prov_name)
+                master_country = prov['страна-владелец']
+                country = get_country(master_country)
+                prov_income = ['', 0]
+                if prov['building'] == 'лесопилка':
+                    prov_income = ['лес', BASE_INCOME]
+                elif prov['building'] == 'фермы':
+                    prov_income = ['еда', BASE_INCOME]
+                elif prov['building'] == 'шахта':
+                    prov_income = ['металлы', BASE_INCOME]
+                elif prov['building'] == 'скважина':
+                    prov_income = ['нефть', BASE_INCOME]
+                elif prov['building'] == 'виэ':
+                    prov_income = ['электрроэнергия', 3]
+                elif prov['building'] == 'аэс':
+                    prov_income = ['электрроэнергия', 5]
+                elif prov['building'] == 'тэс' and (country['лес'] >= 2 or country['нефть'] >= 1):
+                    if country['лес'] >= 2:
+                        country['лес'] -= 2
+                    else:
+                        country['нефть'] -= 1
+                    prov_income = ['электрроэнергия', 3]
+                if prov['статус'] == 'национальная':
+                    country[prov_income[0]] += prov_income[1]
+                elif prov['статус'] == 'удерживаемая':
+                    country[prov_income[0]] += prov_income[1] // 2
+                elif prov['статус'] == 'под влиянием':
+                    country[prov_income[0]] += prov_income[1] * 2 // 3
+                    s = get_country(prov[6])
+                    s[prov_income[0]] += prov_income[1] // 3
+
+

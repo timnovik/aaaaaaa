@@ -35,9 +35,9 @@ def id(s):
 
 def role(user_id):
     cursor.execute('SELECT RANG FROM users_infc WHERE ID = ?', [user_id])
-    s = cursor.fetchall()
+    s = cursor.fetchall()[0]
     if len(s) == 1:
-        return cursor.fetchall()[0][0]
+        return s[0]
     return 0
 
 
@@ -136,8 +136,16 @@ def edit_prov(user_id, prov, **kwargs):
 
 def get_prov(prov):
     cursor.execute('SELECT * FROM prov_infc WHERE NAME = ?', [prov])
-    s = cursor.fetchall()
+    s = cursor.fetchall()[0]
     return {PARAMETERS['prov'][i]: s[i] for i in range(len(PARAMETERS['prov']))}
+
+
+def save_prov(params):
+    cursor.execute('DELETE FROM prov_infc WHERE NAME = ?', [params['название']])
+    cursor.execute(
+        f"INSERT INTO prov_infc VALUES({','.join(['?' for _ in range(len(PARAMETERS['prov']))])})",
+        list(params.values()))
+    conn.commit()
 
 
 def add_country(args, user_id):
@@ -234,37 +242,45 @@ def edit_country(user_id, country, **kwargs):
 
 def get_country(country):
     cursor.execute('SELECT * FROM country_infc WHERE NAME = ?', [country])
-    s = cursor.fetchall()
+    s = cursor.fetchall()[0]
     return {PARAMETERS['country'][i]: s[i] for i in range(len(PARAMETERS['country']))}
 
 
+def save_country(params):
+    cursor.execute('DELETE FROM country_infc WHERE NAME = ?', [params['название']])
+    cursor.execute(
+        f"INSERT INTO country_infc VALUES({','.join(['?' for _ in range(len(PARAMETERS['country']))])})",
+        list(params.values()))
+    conn.commit()
+
+
 def turn(user_id, last_turn):
-    if role(user_id) >= 2:
+    if role(user_id) >= 3:
         if time() - last_turn >= 24 * 60 * 60:
             cursor.execute('SELECT NAME FROM prov_infc')
             for prov_name in cursor.fetchall():
-                prov = get_prov(prov_name)
+                prov = get_prov(prov_name[0])
                 master_country = prov['страна-владелец']
                 country = get_country(master_country)
                 prov_income = ['', 0]
-                if prov['building'] == 'лесопилка':
+                if prov['постройка'] == 'лесопилка':
                     prov_income = ['лес', BASE_INCOME]
-                elif prov['building'] == 'фермы':
+                elif prov['постройка'] == 'фермы':
                     prov_income = ['еда', BASE_INCOME]
-                elif prov['building'] == 'шахта':
+                elif prov['постройка'] == 'шахта':
                     prov_income = ['металлы', BASE_INCOME]
-                elif prov['building'] == 'скважина':
+                elif prov['постройка'] == 'скважина':
                     prov_income = ['нефть', BASE_INCOME]
-                elif prov['building'] == 'виэ':
-                    prov_income = ['электрроэнергия', 3]
-                elif prov['building'] == 'аэс':
-                    prov_income = ['электрроэнергия', 5]
-                elif prov['building'] == 'тэс' and (country['лес'] >= 2 or country['нефть'] >= 1):
+                elif prov['постройка'] == 'виэ':
+                    prov_income = ['электроэнергия', 3]
+                elif prov['постройка'] == 'аэс':
+                    prov_income = ['электроэнергия', 5]
+                elif prov['постройка'] == 'тэс' and (country['лес'] >= 2 or country['нефть'] >= 1):
                     if country['лес'] >= 2:
                         country['лес'] -= 2
                     else:
                         country['нефть'] -= 1
-                    prov_income = ['электрроэнергия', 3]
+                    prov_income = ['электроэнергия', 3]
                 if prov['статус'] == 'национальная':
                     country[prov_income[0]] += prov_income[1]
                 elif prov['статус'] == 'удерживаемая':
@@ -273,5 +289,10 @@ def turn(user_id, last_turn):
                     country[prov_income[0]] += prov_income[1] * 2 // 3
                     s = get_country(prov[6])
                     s[prov_income[0]] += prov_income[1] // 3
-
-
+                    save_country(s)
+                save_country(country)
+        else:
+            return 'Прошло слишком мало времени с предыдущего хода.', last_turn
+    else:
+        return 'У вас недостаточно полномочий.', last_turn
+    return 'Ход сделан успешно.', time()

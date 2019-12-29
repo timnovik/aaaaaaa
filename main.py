@@ -10,16 +10,17 @@ cursor.execute('pragma table_info(prov_infc)')
 COLUMNS_PROV = list(map(lambda x: x[1], cursor.fetchall()))
 cursor.execute('pragma table_info(country_infc)')
 COLUMNS_COUNTRY = list(map(lambda x: x[1], cursor.fetchall()))
+last_turn = 0
 
 for event in longpoll.listen():
     try:
         if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
-            if event.user_id not in update_roles():
-                cursor.execute('INSERT INTO update_roles()_infc VALUES(?,?)', [event.user_id, 1])
+            if not role(event.user_id):
+                cursor.execute('INSERT INTO roles()_infc VALUES(?,?)', [event.user_id, 1])
             # Слушаем longpoll, если пришло сообщение, то:
             cmd = list(map(lambda x: x.lower(), event.text.split()))
             if cmd[0] == 'log':
-                if event.from_user and update_roles()[event.user_id] == 4:
+                if event.from_user and role(event.user_id) == 4:
                     for _ in range(len(log)):
                         vk.messages.send(
                             random_id=0,
@@ -27,7 +28,7 @@ for event in longpoll.listen():
                             message=log[_][1] + ':\n' + log[_][0]
                         )
             elif cmd[0] == 'log_last':
-                if event.from_user and update_roles()[event.user_id] == 4:
+                if event.from_user and role(event.user_id) == 4:
                     try:
                         log_last = log.pop()
                     except:
@@ -41,13 +42,13 @@ for event in longpoll.listen():
                 if event.from_user:
                     try:
                         if cmd[2] == ADMIN_KEY:
-                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
+                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         elif cmd[2] == MAIN_ADMIN_KEY:
-                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
+                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         elif cmd[2] == DEV_KEY:
-                            cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
+                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         else:
                             print(1 / 0)
@@ -61,7 +62,7 @@ for event in longpoll.listen():
                 if event.from_user:
                     vk.messages.send(random_id=0, user_id=event.user_id,
                                      message=
-                                     f'Ты {[0, "игрок", "админ", "главадмин", "разраб"][update_roles()[event.user_id]]}.')
+                                     f'Ты {[0, "игрок", "админ", "главадмин", "разраб"][role(event.user_id)]}.')
             elif cmd[0] == 'роли':
                 if event.from_user:
                     vk.messages.send(
@@ -80,8 +81,8 @@ for event in longpoll.listen():
                         cmd.append(1)
                     if not cmd[1].isdigit():
                         cmd[1] = id(cmd[1])
-                    if cmd[1] in update_roles() and (update_roles()[event.user_id] > update_roles()[cmd[1]] or update_roles()[event.user_id] == 4):
-                        cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [max(1, update_roles()[cmd[1]] - int(cmd[2])), event.user_id])
+                    if role(event.user_id) > role(cmd[1]) or role(event.user_id) == 4:
+                        cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [max(1, role(cmd[1]) - int(cmd[2])), event.user_id])
                         vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                     else:
                         vk.messages.send(random_id=0, user_id=event.user_id, message=NO_PERMISSION)
@@ -91,8 +92,8 @@ for event in longpoll.listen():
                         cmd.append(1)
                     if not cmd[1].isdigit():
                         cmd[1] = id(cmd[1])
-                    if cmd[1] in update_roles() and (update_roles()[event.user_id] > update_roles()[cmd[1]] + cmd[2] or update_roles()[event.user_id] == 4):
-                        cursor.execute('UPDATE update_roles()_infc SET RANG = ? WHERE ID = ?', [min(4, update_roles()[cmd[1]] + int(cmd[2])), event.user_id])
+                    if role(event.user_id) > role(cmd[1]) + int(cmd[2]) or role(event.user_id) == 4:
+                        cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [min(4, role(cmd[1]) + int(cmd[2])), event.user_id])
                         vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                     else:
                         vk.messages.send(random_id=0, user_id=event.user_id, message=NO_PERMISSION)
@@ -200,6 +201,12 @@ for event in longpoll.listen():
                     edit_prov(event.user_id, cmd[2], **d)
             elif cmd[0] == 'test':
                 print(event.text.split('\n'))
+            elif cmd[0] == 'ход':
+                msg, last_turn = turn(event.user_id, last_turn)
+                vk.messages.send(
+                    user_id=event.user_id,
+                    random_id=0,
+                    message=msg)
             else:
                 if event.from_user:
                     vk.messages.send(

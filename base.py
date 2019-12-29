@@ -32,14 +32,6 @@ def create_base():
     BUILD TEXT
     )
     ''')
-    # Влияние - содержит название страны, которая оказывает влияние этой провинции.
-    cursor.execute('''CREATE TABLE IF NOT EXISTS user_infc
-    (NAME TEXT,
-    STATUS TEXT,
-    COUNTRY TEXT,
-    BALANCE TEXT
-    )
-    ''')
     cursor.execute('''CREATE TABLE IF NOT EXISTS corp_infc
     (NAME TEXT,
     BALANCE_MANY INTEGER,

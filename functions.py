@@ -34,11 +34,12 @@ def id(s):
 
 
 def role(user_id):
-    cursor.execute('SELECT RANG FROM users_infc WHERE ID = ?', [user_id])
-    s = cursor.fetchall()[0]
-    if len(s) == 1:
+    try:
+        cursor.execute('SELECT RANG FROM users_infc WHERE ID = ?', [user_id])
+        s = cursor.fetchall()[0]
         return s[0]
-    return 0
+    except:
+        return 0
 
 
 def add_prov(args, user_id):

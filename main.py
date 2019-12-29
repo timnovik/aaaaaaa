@@ -16,7 +16,7 @@ for event in longpoll.listen():
     try:
         if event.type == VkEventType.MESSAGE_NEW and event.to_me and event.text:
             if not role(event.user_id):
-                cursor.execute('INSERT INTO roles()_infc VALUES(?,?)', [event.user_id, 1])
+                cursor.execute('INSERT INTO users_infc VALUES(?,?)', [event.user_id, 1])
             # Слушаем longpoll, если пришло сообщение, то:
             cmd = list(map(lambda x: x.lower(), event.text.split()))
             if cmd[0] == 'log':
@@ -42,13 +42,13 @@ for event in longpoll.listen():
                 if event.from_user:
                     try:
                         if cmd[2] == ADMIN_KEY:
-                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
+                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [2, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         elif cmd[2] == MAIN_ADMIN_KEY:
-                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
+                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [3, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         elif cmd[2] == DEV_KEY:
-                            cursor.execute('UPDATE roles()_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
+                            cursor.execute('UPDATE users_infc SET RANG = ? WHERE ID = ?', [4, event.user_id])
                             vk.messages.send(random_id=0, user_id=event.user_id, message='Роль успешно изменена.')
                         else:
                             print(1 / 0)

@@ -173,9 +173,10 @@ for event in longpoll.listen():
                         user_id=event.user_id,
                         message=f'Параметры: {", ".join(PARAMETERS["prov"])}. Названия и имена - строки без цифр. '
                                 f'Все аргументы писать через запятую+пробел(0, 0, 0)')
-            elif cmd[0:2] == ['добавить', 'провинцию']:
+            elif cmd[:2] == ['добавить', 'провинцию']:
                 if event.from_user:
-                    args = delete_commas(cmd[2:])
+                    args = ' '.join(cmd[2:]).split(', ')
+                    print(args)
                     if len(args) != len(PARAMETERS['prov']):
                         vk.messages.send(
                             random_id=0,
@@ -183,7 +184,6 @@ for event in longpoll.listen():
                             message='Ошибка: некорректное число параметров. Проверьте формат ввода сообщением "параметры провинции" и попробуйте снова.')
                         pass
                     else:
-                        args[2] = id(args[2])
                         answer = add_prov(args, event.user_id)
                         vk.messages.send(
                             random_id=0,
@@ -225,3 +225,4 @@ for event in longpoll.listen():
                         message='Я сломался, напишите об этом кейсе @t13novik'
                     )
         print(event.text)
+    conn.commit()

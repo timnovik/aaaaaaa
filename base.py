@@ -24,7 +24,6 @@ def create_base():
     cursor.execute('''CREATE TABLE IF NOT EXISTS prov_infc
     (NAME TEXT,
     COUNTRY TEXT,
-    OWNER TEXT,
     RANG TEXT,
     TYPE_LAND TEXT,
     STATUS TEXT,

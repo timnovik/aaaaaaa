@@ -49,7 +49,8 @@ def add_prov(args, user_id):
             if CHECK['prov'][i](args[i]):
                 list1.append(args[i])
             else:
-                return f'Ошибка во время чтения параметра №{i + 1}: {PARAMETERS["prov"][i]}. Проверьте формат ввода сообщением "параметры страны" и попробуйте снова.'
+                print(i, args[i])
+                return f'Ошибка во время чтения параметра №{i + 1}: {PARAMETERS["prov"][i]}. Проверьте формат ввода сообщением "параметры провинции" и попробуйте снова.'
         cursor.execute("SELECT * FROM prov_infc WHERE NAME=?", [list1[0]])
         if len(cursor.fetchall()) > 0:
             return 'Такая провинция уже есть.'
@@ -69,13 +70,9 @@ def show_prov(user_id, prov=0):
         except:
             vk.messages.send(random_id=0, user_id=user_id, message='Страна не найдена.')
             return 0
-        if user_id == int(d[2]) or role(user_id) >= 2:
-            d[2] = '@' + name(int(d[2]))
-            for i in range(len(d)):
-                l.append(f'{PARAMETERS["prov"][i]}: {d[i]}')
-            vk.messages.send(random_id=0, user_id=user_id, message='\n'.join(l))
-        else:
-            vk.messages.send(random_id=0, user_id=user_id, message=NO_PERMISSION)
+        for i in range(len(d)):
+            l.append(f'{PARAMETERS["prov"][i]}: {d[i]}')
+        vk.messages.send(random_id=0, user_id=user_id, message='\n'.join(l))
     elif role(user_id) >= 2:
         cursor.execute('SELECT NAME FROM prov_infc')
         d = list(map(lambda x: x[0], cursor.fetchall()))
@@ -282,13 +279,15 @@ def turn(user_id, last_turn):
                     else:
                         country['нефть'] -= 1
                     prov_income = ['электроэнергия', 3]
+                if prov['ранг'] == 'черта мегаполиса':
+                    prov_income[1] *= 2
                 if prov['статус'] == 'национальная':
                     country[prov_income[0]] += prov_income[1]
                 elif prov['статус'] == 'удерживаемая':
                     country[prov_income[0]] += prov_income[1] // 2
                 elif prov['статус'] == 'под влиянием':
                     country[prov_income[0]] += prov_income[1] * 2 // 3
-                    s = get_country(prov[6])
+                    s = get_country(prov['страна, оказывающая влияние'])
                     s[prov_income[0]] += prov_income[1] // 3
                     save_country(s)
                 save_country(country)
